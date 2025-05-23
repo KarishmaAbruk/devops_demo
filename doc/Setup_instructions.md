@@ -1,6 +1,7 @@
-# Jenkins installers are available for several Linux(Ubantu) distributions.
+## Jenkins installers are available for several Linux(Ubantu) distributions.
 
-Long Term Support release
+Long Term Support release Jenkins
+
 A LTS (Long-Term Support) release is chosen every 12 weeks from the stream of regular releases as the stable release for that time period. It can be installed from the debian-stable apt repository.
 
 sudo wget -O /etc/apt/keyrings/jenkins-keyring.asc \
@@ -14,14 +15,20 @@ sudo apt-get update
 
 sudo apt-get install jenkins
 
-Installation of Java
+## Installation of Java
+
 Jenkins requires Java to run, yet not all Linux distributions include Java by default. Additionally, not all Java versions are compatible with Jenkins.
 
-There are multiple Java implementations which you can use. OpenJDK is the most popular one at the moment, we will use it in this guide.
+There are multiple Java implementations which you can use. 
 
-Update the Debian apt repositories, install OpenJDK 21, and check the installation with the commands:
+OpenJDK is the most popular one at the moment, we will use it in this guide.
+
+
+
+## Update the Debian apt repositories, install OpenJDK 21, and check the installation with the commands:
 
 sudo apt update
+
 
 sudo apt install fontconfig openjdk-21-jre
 
@@ -33,14 +40,41 @@ OpenJDK Runtime Environment (build 21.0.3+11-Debian-2)
 
 OpenJDK 64-Bit Server VM (build 21.0.3+11-Debian-2, mixed mode, sharing)
 
-Start Jenkins
-You can enable the Jenkins service to start at boot with the command:
+
+## Start Jenkins
+
+
+### You can enable the Jenkins service to start at boot with the command:
 
 sudo systemctl enable jenkins
-You can start the Jenkins service with the command:
+
+
+### You can start the Jenkins service with the command:
 
 sudo systemctl start jenkins
-You can check the status of the Jenkins service using the command:
+
+
+
+### You can check the status of the Jenkins service using the command:
 
 sudo systemctl status jenkins
+
+
+** The package installation will:
+
+* Setup Jenkins as a daemon launched on start. Run systemctl cat jenkins for more details.
+
+* Create a ‘jenkins’ user to run this service.
+
+* Direct console log output to systemd-journald. Run journalctl -u jenkins.service if you are troubleshooting Jenkins.
+
+* Populate /lib/systemd/system/jenkins.service with configuration parameters for the launch, e.g JENKINS_HOME
+
+* Set Jenkins to listen on port 8080. Access this port with your browser to start configuration.
+
+
+
+
+**[Terraform installation Document](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)**
+
 
