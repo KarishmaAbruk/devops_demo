@@ -11,7 +11,7 @@ pipeline {
     stages {
         stage('Clone Terraform Repo') {
             steps {
-                git url: '', branch: 'main'
+                git url: 'https://github.com/KarishmaAbruk/devops_demo.git', branch: 'main'
             }
         }
 
