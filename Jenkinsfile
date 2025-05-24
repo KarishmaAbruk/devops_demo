@@ -1,47 +1,63 @@
 pipeline {
     agent any
+
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
+        // AWS credentials stored securely in Jenkins Credentials
+        AWS_ACCESS_KEY_ID = credentials('aws_access_key_id')
         AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
+        AWS_DEFAULT_REGION = 'us-east-1'
     }
+
     stages {
-        stage('Terraform Initialization') {
+        stage('Clone Terraform Repo') {
             steps {
-                sh 'terraform init'
-                sh 'pwd'
-                sh 'ls -al'
-                sh 'printenv'
+                git url: 'https://github.com/KarishmaAbruk/devops_demo.git', branch: 'main'
             }
         }
+
+        stage('Initialize Terraform') {
+            steps {
+                sh 'terraform init -no-color'
+            }
+        }
+
         stage('Terraform Format') {
             steps {
-                sh 'terraform fmt -check || exit 0'
+                sh 'terraform fmt -check -no-color || true'
             }
         }
-        stage('Terraform Validate') {
+
+        stage('Validate Terraform Code') {
             steps {
-                sh 'terraform validate'
+                script {
+                    def start = System.currentTimeMillis()
+                    sh 'terraform validate -no-color'
+                    def duration = (System.currentTimeMillis() - start) / 1000
+                    echo "Terraform validation completed in ${duration} seconds."
+                }
             }
         }
-        stage('Terraform Planning') {
+
+        stage('Plan Infrastructure') {
             steps {
-                sh 'terraform plan -no-color'
+                sh 'terraform plan -no-color -out=tfplan'
             }
         }
-        stage('Publish Artifacts') {
+
+        stage('Apply Infrastructure') {
             steps {
-                archiveArtifacts artifacts: 'terraform.tfstate', excludes: 'output/*.md'
+                input message: 'Proceed to apply Terraform plan?', ok: 'Apply'
+                sh 'terraform apply -no-color -auto-approve tfplan'
             }
         }
-        stage('Terraform Apply') {
-            steps {
-                sh 'terraform apply -auto-approve'
-            }
+    }
+
+    post {
+        failure {
+            echo 'Terraform pipeline failed.'
         }
-        stage('Terraform Destroy') {
-            steps {
-                sh 'terraform destroy -auto-approve'
-            }
+        success {
+            echo 'Terraform pipeline completed successfully.'
         }
     }
 }
