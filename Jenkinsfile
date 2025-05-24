@@ -36,9 +36,9 @@ pipeline {
             }
         }
 
-        stage('Validate Terraform') {
-            steps {
-                sh 'terraform validate'
+       stage('Validate Terraform Code') {
+           steps {
+               sh 'terraform validate -no-color -input=false || exit 1'
             }
         }
 
