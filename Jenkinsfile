@@ -20,13 +20,13 @@ pipeline {
 
         stage('Clone Terraform Repo') {
             steps {
-                git url: 'https://github.com/KarishmaAbruk/devops-assessment--Karishma-abruk-containing-.git', branch: 'main'
+                git url: 'https://github.com/KarishmaAbruk/devops_demo.git', branch: 'main'
             }
         }
 
         stage('Initialize Terraform') {
             steps {
-                sh 'terraform init -input=false'
+                sh 'terraform init'
             }
         }
 
