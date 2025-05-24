@@ -1,63 +1,75 @@
-pipeline {
+pipeline { 
     agent any
-
-    environment {
-        // AWS credentials stored securely in Jenkins Credentials
-        AWS_ACCESS_KEY_ID = credentials('aws_access_key_id')
+    environment { 
+        AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id') 
         AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
-        AWS_DEFAULT_REGION = 'us-east-1'
     }
-
-    stages {
-        stage('Clone Terraform Repo') {
+    stages { 
+        stage('Terraform Initialization') { 
+            steps { 
+                sh 'terraform init || terraform init -upgrade'
+            } 
+        } 
+        stage('Terraform Format') { 
+            steps { 
+                sh 'terraform fmt -check || exit 0' 
+            } 
+        } 
+        stage('Terraform Validate') { 
+            steps { 
+                sh 'terraform validate'
+            } 
+        }
+        stage('Terraform Planning') { 
+            steps { 
+                sh 'terraform plan -no-color -out=terraform_plan'
+                sh 'terraform show -json ./terraform_plan > terraform_plan.json'
+            } 
+        }
+        stage('archive terrafrom plan output') {
             steps {
-                git url: 'https://github.com/KarishmaAbruk/devops_demo.git', branch: 'main'
+                archiveArtifacts artifacts: 'terraform_plan.json', excludes: 'output/*.md', onlyIfSuccessful: true
             }
         }
-
-        stage('Initialize Terraform') {
-            steps {
-                sh 'terraform init -no-color'
-            }
-        }
-
-        stage('Terraform Format') {
-            steps {
-                sh 'terraform fmt -check -no-color || true'
-            }
-        }
-
-        stage('Validate Terraform Code') {
+        stage('Review and Run terraform apply') {
             steps {
                 script {
-                    def start = System.currentTimeMillis()
-                    sh 'terraform validate -no-color'
-                    def duration = (System.currentTimeMillis() - start) / 1000
-                    echo "Terraform validation completed in ${duration} seconds."
+                    env.selected_action = input  message: 'Select action to perform',ok : 'Proceed',id :'tag_id',
+                    parameters:[choice(choices: ['apply', 'abort'], description: 'Select action', name: 'action')]
                 }
             }
         }
-
-        stage('Plan Infrastructure') {
+        stage('Terraform Apply') { 
             steps {
-                sh 'terraform plan -no-color -out=tfplan'
+                script {
+                    if (env.selected_action == 'apply') {
+                        sh 'terraform apply -auto-approve'
+                    } else {
+                        sh 'echo Review failed and terraform apply was aborted'
+                        sh 'exit 0'
+                    }
+                }   
             }
         }
-
-        stage('Apply Infrastructure') {
+        stage('Run terraform destroy or not?') {
             steps {
-                input message: 'Proceed to apply Terraform plan?', ok: 'Apply'
-                sh 'terraform apply -no-color -auto-approve tfplan'
+                script {
+                    env.selected_action = input  message: 'Select action to perform',ok : 'Proceed',id :'tag_id',
+                    parameters:[choice(choices: ['destroy', 'abort'], description: 'Select action', name: 'action')]
+                }
             }
         }
-    }
-
-    post {
-        failure {
-            echo 'Terraform pipeline failed.'
+        stage('Terraform Destroy') { 
+            steps {
+                script {
+                    if (env.selected_action == "destroy") {
+                        sh 'terraform destroy -auto-approve'
+                    } else {
+                        sh 'echo We are not destroying the resource initialted, aborted!!!'
+                        sh 'exit 0'
+                    }
+                }
+            } 
         }
-        success {
-            echo 'Terraform pipeline completed successfully.'
-        }
-    }
+    } 
 }
