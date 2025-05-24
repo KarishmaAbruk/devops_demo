@@ -1,67 +1,47 @@
 pipeline {
     agent any
-
     environment {
         AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
         AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
-        AWS_DEFAULT_REGION    = 'us-east-1'
     }
-
-    options {
-        timeout(time: 15, unit: 'MINUTES') // Prevents long-running jobs
-    }
-
     stages {
-        stage('Clean Workspace') {
-            steps {
-                cleanWs()
-            }
-        }
-
-        stage('Clone Terraform Repo') {
-            steps {
-                git url: 'https://github.com/KarishmaAbruk/devops_demo.git', branch: 'main'
-            }
-        }
-
-        stage('Initialize Terraform') {
+        stage('Terraform Initialization') {
             steps {
                 sh 'terraform init'
+                sh 'pwd'
+                sh 'ls -al'
+                sh 'printenv'
             }
         }
-
-        stage('Check Terraform Format') {
+        stage('Terraform Format') {
             steps {
-                sh 'terraform fmt -check || true'
+                sh 'terraform fmt -check'
             }
         }
-
-       stage('Validate Terraform Code') {
-           steps {
-                sh 'terraform validate -no-color || exit 1'
-            }
-        }
-
-        stage('Plan Infrastructure') {
+        stage('Terraform Validate') {
             steps {
-                sh 'terraform plan -out=tfplan'
+                sh 'terraform validate'
             }
         }
-
-        stage('Approve and Apply Infrastructure') {
+        stage('Terraform Planning') {
             steps {
-                input message: 'Do you want to apply the Terraform plan?', ok: 'Yes, Apply'
-                sh 'terraform apply -auto-approve tfplan'
+                sh 'terraform plan -no-color'
             }
         }
-    }
-
-    post {
-        success {
-            echo '✅ EC2 instance successfully created using Terraform.'
+        stage('Publish Artifacts') {
+            steps {
+                archiveArtifacts artifacts: 'terraform.tfstate', excludes: 'output/*.md'
+            }
         }
-        failure {
-            echo '❌ Terraform pipeline failed. Check logs for details.'
+        stage('Terraform Apply') {
+            steps {
+                sh 'terraform apply -auto-approve'
+            }
+        }
+        stage('Terraform Destroy') {
+            steps {
+                sh 'terraform destroy -auto-approve'
+            }
         }
     }
 }
