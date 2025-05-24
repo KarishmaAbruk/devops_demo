@@ -1,67 +1,70 @@
-pipeline {
-    agent any
+provider "aws" {
+  region = var.region
+}
 
-    environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
-        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
-        AWS_DEFAULT_REGION    = 'us-east-1'
-    }
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
 
-    options {
-        timeout(time: 15, unit: 'MINUTES') // Prevents long-running jobs
-    }
+resource "aws_subnet" "public" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+}
 
-    stages {
-        stage('Clean Workspace') {
-            steps {
-                cleanWs()
-            }
-        }
+resource "aws_internet_gateway" "gw" {
+  vpc_id = aws_vpc.main.id
+}
 
-        stage('Clone Terraform Repo') {
-            steps {
-                git url: 'https://github.com/KarishmaAbruk/devops-assessment--Karishma-abruk-containing-.git', branch: 'main'
-            }
-        }
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
 
-        stage('Initialize Terraform') {
-            steps {
-                sh 'terraform init -input=false'
-            }
-        }
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.gw.id
+  }
+}
 
-        stage('Check Terraform Format') {
-            steps {
-                sh 'terraform fmt -check || true'
-            }
-        }
+resource "aws_route_table_association" "a" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
+}
 
-        stage('Validate Terraform') {
-            steps {
-                sh 'terraform validate'
-            }
-        }
+resource "aws_security_group" "web_sg" {
+  name        = "allow_http_ssh"
+  description = "Allow HTTP and SSH"
+  vpc_id      = aws_vpc.main.id
 
-        stage('Plan Infrastructure') {
-            steps {
-                sh 'terraform plan -out=tfplan'
-            }
-        }
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
-        stage('Approve and Apply Infrastructure') {
-            steps {
-                input message: 'Do you want to apply the Terraform plan?', ok: 'Yes, Apply'
-                sh 'terraform apply -auto-approve tfplan'
-            }
-        }
-    }
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
-    post {
-        success {
-            echo '✅ EC2 instance successfully created using Terraform.'
-        }
-        failure {
-            echo '❌ Terraform pipeline failed. Check logs for details.'
-        }
-    }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_instance" "web" {
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  key_name               = var.key_name
+  subnet_id              = aws_subnet.public.id
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
+  user_data              = file("install_apache.sh")
+  tags = {
+    Name = "WebServer"
+  }
 }
